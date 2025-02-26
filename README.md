@@ -1,4 +1,4 @@
-Plateforme de Gestion des Rendez-vous
+# Projet_NodeJs_Rendez_vous
 
 📌 Description :
 Ce projet consiste à développer une application web permettant aux utilisateurs de réserver, modifier et annuler des rendez-vous avec des professionnels (médecins, coachs, avocats, etc.). L'application vise à simplifier la gestion des rendez-vous tout en offrant une expérience utilisateur fluide et intuitive.
