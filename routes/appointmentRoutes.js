@@ -1,52 +1,40 @@
-const express = require("express");
+// routes/appointmentRoutes.js
+const express = require('express');
 const router = express.Router();
-const Appointment = require("../models/Appointment"); // Importer le modèle
+const Appointment = require('../models/Appointment');  // Import your Appointment model
 
-// Récupérer tous les rendez-vous
-router.get("/", async (req, res) => {
+// Endpoint to get all appointments
+router.get('/appointments', async (req, res) => {
     try {
         const appointments = await Appointment.find();
-        res.json(appointments);
+        res.status(200).json(appointments);
     } catch (error) {
-        res.status(500).json({ message: "Erreur serveur", error });
+        res.status(500).json({ error: 'Failed to fetch appointments' });
     }
 });
 
-//  Ajouter un rendez-vous
-router.post("/", async (req, res) => {
+// Endpoint to book an appointment (change route to 'bookappointment')
+router.post('/api/bookappointment', async (req, res) => {
     try {
-        const { date, heure, nom, email, motif } = req.body;
-        const newAppointment = new Appointment({ date, heure, nom, email, motif });
+        const { doctor, email, appointmentDate } = req.body;
+
+        if (!doctor || !email || !appointmentDate) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        const newAppointment = new Appointment({
+            doctorName: doctor,
+            email,
+            appointmentDate
+        });
+
         await newAppointment.save();
-        res.status(201).json(newAppointment);
+        res.status(201).json({ message: "Appointment booked successfully", appointment: newAppointment });
     } catch (error) {
-        res.status(400).json({ message: "Erreur lors de l'ajout", error });
+        console.error("Error booking appointment:", error);  // Log the error to the console
+        res.status(500).json({ error: "Failed to book appointment", details: error.message });
     }
 });
 
-/// Modifier un rendez-vous
-router.put("/:id", async (req, res) => {
-    try {
-        const updatedAppointment = await Appointment.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true } // Retourne les nouvelles données mises à jour
-        );
-        res.json(updatedAppointment);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la modification" });
-    }
-});
-
-//  Supprimer un rendez-vous
-router.delete("/:id", async (req, res) => {
-    try {
-        await Appointment.findByIdAndDelete(req.params.id);
-        res.json({ message: "Rendez-vous supprimé avec succès" });
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la suppression", error });
-    }
-});
-
-
+// Export the router to use in other files
 module.exports = router;

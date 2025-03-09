@@ -1,58 +1,46 @@
-const cron = require("node-cron");
-const fetch = require("node-fetch"); // Vérifie qu'il est installé !
-require("dotenv").config();
+const express = require("express");
 const nodemailer = require("nodemailer");
+const app = express();
+app.use(express.json()); 
 
-// Configurer le transporteur SMTP
+require("dotenv").config();
+
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.EMAIL_USER, // Mets ton e-mail
-        pass: process.env.EMAIL_PASS, // Mets ton App Password si Gmail
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS,
     },
 });
 
-// Fonction pour envoyer un email
-const sendReminderEmail = (email, nom, date, heure) => {
+// Route pour enregistrer un rendez-vous et envoyer un e-mail
+app.post("/api/appointments", (req, res) => {
+    const { email, category, doctor, appointmentDate } = req.body;
+
+    sendReminderEmail(email, category, doctor, appointmentDate);
+
+    res.status(201).json({ message: "Rendez-vous ajouté et email envoyé" });
+});
+
+// Fonction pour envoyer l'e-mail de rappel
+const sendReminderEmail = (email, category, doctor, appointmentDate) => {
     const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
+        from: process.env.EMAIL_USER,  
+        to: email, 
         subject: "Rappel de votre rendez-vous",
-        text: `Bonjour ${nom},\n\nCeci est un rappel pour votre rendez-vous prévu le ${date} à ${heure}.\n\nMerci !`,
+        text: `Bonjour,\n\nVous avez un rendez-vous avec un ${category} ${doctor ? "Dr. " + doctor : ""} prévu le ${appointmentDate}.\n\nMerci de votre confiance !`,
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-            console.error("❌ Erreur d'envoi d'email :", error);
+            console.error("Erreur lors de l'envoi de l'email :", error);
         } else {
-            console.log("✅ E-mail envoyé :", info.response);
+            console.log("Email envoyé à :", email);
+            console.log("Réponse du serveur :", info.response);
         }
     });
 };
 
-// Tester l'envoi immédiat d'un email
-sendReminderEmail("Yosrbouguerra040@gmail.com", "Test User", "2025-02-25", "14:00");
-
-// Planifier un job qui tourne tous les jours à 08:00
-cron.schedule("0 8 * * *", async () => {
-    console.log("🔔 Vérification des rendez-vous pour rappel...");
-
-    try {
-        const response = await fetch("http://localhost:5000/api/appointments");
-        const appointments = await response.json();
-
-        const today = new Date();
-        today.setDate(today.getDate() + 1); // Un jour avant le rendez-vous
-        const reminderDate = today.toISOString().split("T")[0];
-
-        appointments.forEach((appt) => {
-            if (appt.date === reminderDate) {
-                sendReminderEmail(appt.email, appt.nom, appt.date, appt.heure);
-            }
-        });
-    } catch (error) {
-        console.error("❌ Erreur lors de la récupération des rendez-vous :", error);
-    }
+app.listen(5000, () => {
+    console.log("Serveur en écoute sur le port 5000");
 });
-
-console.log("📅 Planificateur de rappels activé !");

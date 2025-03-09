@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Appointment</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-3xl mx-auto p-4 mt-10">
+<form id="appointmentForm" class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="mb-4">
+        <label for="email" class="block text-gray-700">Email</label>
+        <input type="email" id="email" name="email" required class="w-full p-3 border border-gray-300 rounded-lg">
+    </div>
+
+    <div class="mb-4">
+        <label for="category" class="block text-gray-700">Choose Doctor Category</label>
+        <select id="category" name="category" required class="w-full p-3 border border-gray-300 rounded-lg">
+            <option value="">Select Category</option>
+            <option value="generalist">Generalist</option>
+            <option value="ophthalmologist">Ophthalmologist</option>
+        </select>
+    </div>
+
+    <div id="doctorSelection" class="mb-4 hidden">
+        <label for="doctor" class="block text-gray-700">Choose a Doctor</label>
+        <select id="doctor" name="doctor" required class="w-full p-3 border border-gray-300 rounded-lg">
+            <option value="">Select Doctor</option>
+        </select>
+    </div>
+
+    <div id="appointmentDetails" class="hidden mt-4">
+        <label for="appointmentDate" class="block text-gray-700">Appointment Date</label>
+        <input type="datetime-local" id="appointmentDate" name="appointmentDate" required class="w-full p-3 border border-gray-300 rounded-lg">
+    </div>
+
+    <button type="submit" id="bookAppointmentBtn" class="w-full py-3 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 mt-4">
+        Book Appointment
+    </button>
+</form>
+
+<script>
+    const categorySelect = document.getElementById('category');
+    const doctorSelectionDiv = document.getElementById('doctorSelection');
+    const appointmentDetailsDiv = document.getElementById('appointmentDetails');
+    const bookAppointmentBtn = document.getElementById('bookAppointmentBtn');
+    const doctorSelect = document.getElementById('doctor');
+    
+    categorySelect.addEventListener('change', function () {
+        const selectedCategory = categorySelect.value;
+        if (selectedCategory) {
+            doctorSelectionDiv.classList.remove('hidden');
+            populateDoctors(selectedCategory);
+        } else {
+            doctorSelectionDiv.classList.add('hidden');
+            appointmentDetailsDiv.classList.add('hidden');
+        }
+    });
+    
+    function populateDoctors(category) {
+        const doctors = {
+            generalist: ['Dr. Smith', 'Dr. Johnson'],
+            ophthalmologist: ['Dr. Brown', 'Dr. Taylor'],
+        };
+    
+        doctorSelect.innerHTML = '<option value="">Select Doctor</option>'; 
+        doctors[category].forEach(doctor => {
+            const option = document.createElement('option');
+            option.value = doctor;
+            option.textContent = doctor;
+            doctorSelect.appendChild(option);
+        });
+    
+        doctorSelect.addEventListener('change', function () {
+            appointmentDetailsDiv.classList.remove('hidden');
+        });
+    }
+    bookAppointmentBtn.addEventListener('click', function () {
+        const email = document.getElementById('email').value;
+        const category = categorySelect.value;
+        const doctor = doctorSelect.value;
+        const appointmentDate = document.getElementById('appointmentDate').value;
+    
+        if (email && category && doctor && appointmentDate) {
+            const appointmentData = {
+                email,
+                category,
+                doctor,
+                appointmentDate
+            };
+    
+            console.log('Appointment Data:', appointmentData);
+       alert('Appointment successfully booked!');
+            window.location.href = './rendezvous.html';  
+
+        } else {
+            alert('Please fill in all fields.');
+        }
+    });
+    </script>
+    <div id="doctorSelection" class="mb-4 hidden">
+        <label for="doctor" class="block text-gray-700">Choose a Doctor</label>
+        <select id="doctor" name="doctor" required class="w-full p-3 border border-gray-300 rounded-lg">
+            <option value="">Select Doctor</option>
+        </select>
+    </div>
+    
+    <div id="appointmentDetails" class="hidden mt-4">
+        <label for="appointmentDate" class="block text-gray-700">Appointment Date</label>
+        <input type="datetime-local" id="appointmentDate" name="appointmentDate" required class="w-full p-3 border border-gray-300 rounded-lg">
+        
+        <button type="submit" class="w-full py-3 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 mt-4">
+            Book Appointment
+        </button>
+    </div>
+</div>
+<script>document.getElementById('bookAppointmentBtn').addEventListener('click', function(event) {
+        console.log("Button clicked!");  
+        event.preventDefault();  
+
+    const email = document.getElementById('email').value;
+    const category = document.getElementById('category').value;
+    const doctor = document.getElementById('doctor').value;
+    const appointmentDate = document.getElementById('appointmentDate').value;
+
+    
+    console.log("Form Data:", email, category, doctor, appointmentDate);
+
+    if (email && category && doctor && appointmentDate) {
+        const appointmentData = {
+            email,
+            category,
+            doctor,
+            appointmentDate
+        };
+
+        axios.post('http://localhost:5000/api/appointments', appointmentData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            console.log('Appointment successfully booked:', response.data);
+            window.location.href = '/appointment-form/rendezvous.html';
+        })
+        .catch(error => {
+            console.error('Error booking appointment:', error);
+        });
+    } else {
+        alert('Please fill in all fields.');
+    }
+});
+
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const bookBtn = document.getElementById("bookBtn");
+
+        bookBtn.addEventListener("click", function() {
+            const appointmentData = {
+                doctorName: "Dr. Alice Smith",
+                doctorSpecialty: "Cardiology",
+                email: "yosrbouguerra040@gmail.com",
+                date: "2025-02-13",
+                time: "15:20:00",
+                city: "Chicago",
+                area: "Downtown"
+            };
+
+            axios.post('http://localhost:5000/api/appointments', appointmentData)
+                .then(response => {
+                    alert(response.data.message);  
+                    window.location.href = "rendezvous.html";
+                })
+                .catch(error => {
+                    console.error("Error booking appointment:", error);
+                    alert("An error occurred. Please try again later.");
+                });
+        });
+    });
+</script>
+<script>
+const email = document.getElementById('email').value;
+const category = document.getElementById('category').value;
+const doctor = document.getElementById('doctor').value;
+const appointmentDate = document.getElementById('appointmentDate').value;
+
+fetch('http://localhost:5000/api/appointments', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json' 
+    },
+    body: JSON.stringify({ name: 'John Doe', date: '2024-03-08' })
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+ 
+</script>
+<script>
+   document.getElementById('appointmentForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const email = document.getElementById('email').value;
+    const category = document.getElementById('category').value;
+
+    if (!email || !category) {
+        alert("Please fill in all fields.");
+        return;
+    }
+
+    try {
+        const response = await axios.get(`/api/doctors?category=${category}`);
+        const doctors = response.data;
+
+        const doctorSelect = document.getElementById('doctor');
+        const doctorSelection = document.getElementById('doctorSelection');
+        const appointmentDetails = document.getElementById('appointmentDetails');
+        
+        doctorSelection.classList.remove('hidden');
+        doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
+
+        if (doctors.length === 0) {
+            doctorSelect.innerHTML = `<option value="">No doctors available</option>`;
+        } else {
+            doctors.forEach(doctor => {
+                const option = document.createElement('option');
+                option.value = doctor.name;
+                option.textContent = doctor.name;
+                doctorSelect.appendChild(option);
+            });
+        }
+
+        doctorSelect.addEventListener('change', () => {
+            if (doctorSelect.value) {
+                appointmentDetails.classList.remove('hidden');
+            } else {
+                appointmentDetails.classList.add('hidden');
+            }
+
+    if (formIsValid) {
+        alert('Appointment successfully booked!');
+        setTimeout(function() {
+            window.location.href = 'rendezvous.html';  
+        }, 1000);
+    } else {
+        alert('Please fill in all fields.');
+    }
+        });
+
+    } catch (error) {
+        console.error('Error fetching doctors:', error);
+    }
+});
+
+</script>
+<script>document.getElementById("appointmentForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    const email = document.getElementById("email").value;
+    const category = document.getElementById("category").value;
+    const doctor = document.getElementById("doctor") ? document.getElementById("doctor").value : null;
+    const appointmentDate = document.getElementById("appointmentDate").value;
+
+    const appointmentData = {
+        email,
+        category,
+        doctor,
+        appointmentDate
+    };
+
+    fetch("http://localhost:5000/api/appointments", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(appointmentData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert("Rendez-vous réservé et email envoyé !");
+        } else {
+            alert("Erreur lors de la réservation.");
+        }
+    })
+    .catch(error => {
+        console.error("Erreur lors de la réservation :", error);
+        alert("Erreur de réseau. Veuillez réessayer.");
+    });
+});
+</script>
+</body>
+</html>
