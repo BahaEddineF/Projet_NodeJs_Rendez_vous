@@ -41,7 +41,29 @@
         Book Appointment
     </button>
 </form>
-
+<script>// Function to handle form submission
+    async function handleFormSubmit(event) {
+      event.preventDefault();
+    
+      const email = document.getElementById('updateEmail').value;
+      const doctor = document.getElementById('updateDoctor').value;
+      const appointmentDate = document.getElementById('updateAppointmentDate').value;
+    
+      const appointmentData = {
+        email,
+        doctor,
+        appointmentDate
+      };
+    
+      try {
+        await axios.post('http://localhost:5000/api/appointments', appointmentData);
+        alert('Appointment created and reminder set!');
+      } catch (error) {
+        console.error('Error creating appointment:', error);
+        alert('Error creating the appointment.');
+      }
+    }
+    </script>
 <script>
     const categorySelect = document.getElementById('category');
     const doctorSelectionDiv = document.getElementById('doctorSelection');
