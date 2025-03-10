@@ -7,13 +7,16 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const Appointment = require('./models/Appointment');
+const User = require('./models/User'); // Add the User model
 const app = express();
 const path = require('path');
-
-// Static folder setup
+const Doctor = require("./models/Doctor"); // Vérifie que ce fichier existe
+const Worker = require("./models/worker"); 
+// Static file serving
 app.use(express.static(path.join(__dirname, 'appointment-form')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Example doctors list
 const doctors = [
     { name: "Dr. Alice Smith", specialty: "Generalist", category: "generalist" },
     { name: "Dr. Bob Johnson", specialty: "Generalist", category: "generalist" },
@@ -21,107 +24,40 @@ const doctors = [
     { name: "Dr. David Brown", specialty: "Ophthalmologist", category: "ophthalmologist" }
 ];
 
-// User storage (use DB in production)
-const users = [];
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+})
+    .then(() => console.log("✅ MongoDB Connected"))
+    .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// Middleware to parse JSON and URL-encoded data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-//partie jiged
-// 📌 Enregistrement d'un nouvel utilisateur (Signup)
-app.post("/register", async (req, res) => {
-    const { username, password } = req.body;
-
-    // Check if user already exists
-    const existingUser = users.find((user) => user.username === username);
-    if (existingUser) {
-        return res.status(400).json({ message: "Utilisateur déjà existant" });
-    }
-
-    // Hash password and store user
-    const hashedPassword = await bcrypt.hash(password, 10);
-    users.push({ username, password: hashedPassword });
-
-    res.status(201).json({ message: "Utilisateur enregistré avec succès" });
-});
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-
-  // Simulate a database check for the username and password
-  if (username === 'admin' && password === 'password123') {
-      res.json({ success: true, message: 'Login successful' });
-  } else {
-      res.json({ success: false, message: 'Nom d\'utilisateur ou mot de passe incorrect' });
+// Set up nodemailer transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+      user: process.env.EMAIL_USER, // Your email address
+      pass: process.env.EMAIL_PASS  // Your email password or app password
   }
 });
-app.post('/api/register', async (req, res) => {
-  const { fullname, email, username, password } = req.body;
 
-  // Simple validation
-  if (!fullname || !email || !username || !password) {
-      return res.json({ success: false, message: 'Tous les champs sont obligatoires.' });
+// Appointment Routes
+
+// Get a specific appointment by ID
+app.get('/api/appointments/:id', async (req, res) => {
+  const appointmentId = req.params.id;
+  try {
+      const appointment = await Appointment.findById(appointmentId);
+      if (!appointment) {
+          return res.status(404).json({ message: 'Appointment not found' });
+      }
+      res.json(appointment);
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching appointment data' });
   }
-
-  // Check if username already exists
-  const userExists = users.find(user => user.username === username);
-  if (userExists) {
-      return res.json({ success: false, message: 'Nom d\'utilisateur déjà pris.' });
-  }
-
-  // Hash password before saving
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  // Save the user to the "database"
-  users.push({
-      fullname,
-      email,
-      username,
-      password: hashedPassword
-  });
-
-  res.json({ success: true, message: 'Inscription réussie.' });
-});
-// 📌 Connexion (Login) et génération du JWT
-app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
-    const user = users.find((user) => user.username === username);
-
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ message: "Identifiants incorrects" });
-    }
-
-    // Generate JWT
-    const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET, {
-        expiresIn: "1h",
-    });
-
-    res.json({ token });
-});
-//jihed end 
-// 📌 Middleware pour protéger les routes
-const verifyToken = (req, res, next) => {
-    const token = req.header("Authorization")?.split(" ")[1];
-    if (!token) {
-        return res.status(403).json({ message: "Accès refusé" });
-    }
-
-    try {
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = verified;
-        next();
-    } catch (error) {
-        res.status(401).json({ message: "Token invalide" });
-    }
-};
-//jihed
-// 📌 Route protégée (nécessite un token JWT)
-app.get("/protected", verifyToken, (req, res) => {
-    res.json({ message: "Accès autorisé", user: req.user });
 });
 
-// 📌 Appointment Routes
-
-// Route to get doctors by category
+// Get doctors by category
 app.get("/api/doctors", (req, res) => {
     const { category } = req.query;
 
@@ -137,35 +73,50 @@ app.get("/api/doctors", (req, res) => {
     }
 });
 
-// Route to handle appointments
-app.post("/api/appointments", async (req, res) => {
-    try {
-        const { email, category, doctor, appointmentDate } = req.body;
+// Create an appointment and send confirmation email
+app.post('/api/appointments', async (req, res) => {
+  const { email, doctor, appointmentDate, category } = req.body;
 
-        // Validate appointment data
-        if (!email || !category || !doctor || !appointmentDate) {
-            return res.status(400).json({ error: "All fields are required." });
-        }
+  // Check for required fields
+  if (!email || !doctor || !appointmentDate || !category) {
+    return res.status(400).send('Missing required fields');
+  }
 
-        const appointment = new Appointment({
-            email,
-            category,
-            doctor,
-            appointmentDate
-        });
-        await appointment.save();
-        
-        // Schedule email reminder for 24 hours before the appointment
-        scheduleReminder(appointment);
+  try {
+    // Create the appointment and save it
+    const appointment = new Appointment({ email, doctor, appointmentDate, category });
+    await appointment.save();
 
-        res.status(201).json({ message: "Appointment booked successfully!" });
-    } catch (error) {
-        console.error('Error while booking appointment:', error);
-        res.status(500).json({ error: "An error occurred while booking the appointment." });
-    }
+    // Send the confirmation email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Confirmation de votre rendez-vous',
+      text: `
+        Bonjour ${email},
+        Votre rendez-vous a été réservé avec succès pour le docteur ${doctor}.
+        Date : ${appointmentDate}
+        Catégorie : ${category}
+        Merci et à bientôt !
+      `
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log('Erreur lors de l\'envoi de l\'email:', error);
+        return res.status(500).json({ message: 'Error sending email.' });
+      }
+
+      console.log('Email envoyé:', info.response);
+      return res.status(200).json({ message: 'Appointment booked successfully, and confirmation email sent!' });
+    });
+  } catch (error) {
+    console.error('Error booking appointment:', error);
+    return res.status(500).json({ message: 'Error booking appointment.' });
+  }
 });
 
-// Route to get all appointments
+// Get all appointments
 app.get("/api/appointments", async (req, res) => {
     try {
         const appointments = await Appointment.find();
@@ -176,7 +127,7 @@ app.get("/api/appointments", async (req, res) => {
     }
 });
 
-// Route to delete an appointment
+// Delete an appointment by ID
 app.delete('/api/appointments/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -190,67 +141,163 @@ app.delete('/api/appointments/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+//edit 
+app.put('/api/appointments/:id', async (req, res) => {
+  const { id } = req.params;
+  const { doctor, email, appointmentDate } = req.body;
 
-// Route to send reminder email for appointments
-function scheduleReminder(appointment) {
-    const appointmentDate = new Date(appointment.appointmentDate);
-    const now = new Date();
-    const reminderTime = new Date(appointmentDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours before
+  if (!doctor || !email || !appointmentDate) {
+      return res.status(400).json({ error: 'All fields are required' });
+  }
 
-    const timeToSendReminder = reminderTime.getTime() - now.getTime();
+  // Validate appointment date (basic check)
+  const date = new Date(appointmentDate);
+  if (isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'Invalid appointment date' });
+  }
 
-    if (timeToSendReminder > 0) {
-        setTimeout(() => {
-            sendReminderEmail(appointment.email, appointment.category, appointment.doctor, appointment.appointmentDate);
-        }, timeToSendReminder);
-    }
-}
+  try {
+      // Find and update the appointment
+      const updatedAppointment = await Appointment.findByIdAndUpdate(
+          id,
+          { doctorName: doctor, email, appointmentDate },
+          { new: true } // Return the updated document
+      );
 
-// Function to send email reminder
-const sendReminderEmail = (email, category, doctor, appointmentDate) => {
-    const formattedDate = new Date(appointmentDate).toLocaleString("fr-FR", {
-        weekday: "long", year: "numeric", month: "long", day: "numeric",
-        hour: "2-digit", minute: "2-digit"
-    });
+      if (!updatedAppointment) {
+          return res.status(404).json({ message: 'Appointment not found' });
+      }
 
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Rappel de votre rendez-vous",
-        text: `Bonjour,\n\nVous avez un rendez-vous avec un ${category} ${doctor ? "Dr. " + doctor : ""} prévu le ${formattedDate}.\n\nMerci de votre confiance !\n\nCordialement, votre clinique.`,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.error("Erreur lors de l'envoi de l'email :", error);
-        } else {
-            console.log("Email de rappel envoyé à :", email);
-        }
-    });
-};
-
-// Transporter for sending emails using Gmail
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
+      res.status(200).json({ message: 'Appointment updated successfully', appointment: updatedAppointment });
+  } catch (error) {
+      console.error('Error updating appointment:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+  }
 });
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-    .then(() => console.log("✅ MongoDB Connected"))
-    .catch((err) => console.error("❌ MongoDB Connection Error:", err));
+// User login route
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+      const user = await User.findOne({ email });
+
+      if (!user) {
+          return res.status(404).json({ message: "Utilisateur non trouvé" });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+          return res.status(400).json({ message: "Mot de passe incorrect" });
+      }
+
+      const token = jwt.sign({ userId: user._id }, "secretkey", { expiresIn: '1h' });
+      res.json({ token });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Erreur de connexion" });
+  }
+});
+
+// Protected route 
+app.get("/protected", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) return res.status(401).json({ error: "Access denied" });
+
+  try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      res.json({ message: "Protected data", user: decoded });
+  } catch {
+      res.status(403).json({ error: "Invalid token" });
+  }
+});
 
 // Home route to serve static files
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/appointment-form/index.html");
 });
+//baha 
+let users = [];
+// API to add a user (Doctor or Worker)
+app.post("/addUser", async (req, res) => {
+    const { name, email, role, specialization, jobTitle } = req.body;
 
+    try {
+        if (role === "doctor") {
+            const newDoctor = new Doctor({ name, email, specialization });
+            await newDoctor.save();
+            res.status(201).json({ message: "Doctor added successfully", newDoctor });
+        } else if (role === "worker") {
+            const newWorker = new Worker({ name, email, jobTitle });
+            await newWorker.save();
+            res.status(201).json({ message: "Worker added successfully", newWorker });
+        } else {
+            res.status(400).json({ message: "Invalid role" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+});
+
+// API to get all users
+app.get("/getUsers", async (req, res) => {
+    try {
+        const doctors = await Doctor.find();
+        const workers = await Worker.find();
+        console.log("Doctors:", doctors);
+        console.log("Workers:", workers);
+        res.json({ doctors, workers });
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ message: "Server error", error });
+    }
+});
+
+// API to update a user (Doctor or Worker)
+app.put("/updateUser/:id", async (req, res) => {
+    const { name, email, role, specialization, jobTitle } = req.body;
+
+    try {
+        if (role === "doctor") {
+            const updatedDoctor = await Doctor.findByIdAndUpdate(
+                req.params.id,
+                { name, email, specialization },
+                { new: true }
+            );
+            res.status(200).json({ message: "Doctor updated successfully", updatedDoctor });
+        } else if (role === "worker") {
+            const updatedWorker = await Worker.findByIdAndUpdate(
+                req.params.id,
+                { name, email, jobTitle },
+                { new: true }
+            );
+            res.status(200).json({ message: "Worker updated successfully", updatedWorker });
+        } else {
+            res.status(400).json({ message: "Invalid role" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+});
+
+// API to delete a user (Doctor or Worker)
+app.delete("/deleteUser/:id", async (req, res) => {
+    try {
+        const doctor = await Doctor.findByIdAndDelete(req.params.id);
+        const worker = await Worker.findByIdAndDelete(req.params.id);
+
+        if (doctor) {
+            res.status(200).json({ message: "Doctor deleted successfully" });
+        } else if (worker) {
+            res.status(200).json({ message: "Worker deleted successfully" });
+        } else {
+            res.status(404).json({ message: "User not found" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+});
 // Start the server
 const port = process.env.PORT || 5000;
 app.listen(port, () => {

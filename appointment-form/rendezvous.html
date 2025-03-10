@@ -14,7 +14,7 @@
         <!-- Appointment List -->
         <ul id="appointmentList" class="space-y-4"></ul>
         
-        <!-- Modify Appointment Form -->
+        <!-- Modify Appointment Form (Hidden by default) -->
         <div id="modifyForm" class="hidden mt-6 bg-white p-4 rounded-lg shadow-md">
             <h3 class="text-xl font-bold mb-4">Modify Appointment</h3>
             <form id="updateAppointmentForm">
@@ -76,48 +76,67 @@
             }
         }
 
+        // Function to edit an appointment and show a custom modal alert-like form
         async function editAppointment(id) {
-    try {
-        const response = await axios.get(`http://localhost:5000/api/appointments/${id}`);
-        console.log(response.data);  // Log the data
-        const appointment = response.data;
+            try {
+                const response = await axios.get(`http://localhost:5000/api/appointments/${id}`);
+                const appointment = response.data;
 
-        document.getElementById('updateEmail').value = appointment.email;
-        document.getElementById('updateDoctor').value = appointment.doctor;
-        document.getElementById('updateAppointmentDate').value = new Date(appointment.appointmentDate).toISOString().slice(0, 16);
+                // Log the data to ensure it's being fetched correctly
+                console.log(appointment);
 
-        document.getElementById('modifyForm').classList.remove('hidden');
-        
-        // Handle form submission to update the appointment
-        const updateForm = document.getElementById('updateAppointmentForm');
-        updateForm.onsubmit = async (event) => {
-            event.preventDefault();
+                // Create a modal-like form in an alert-like format
+                const formHtml = `
+                    <div class="p-6 bg-white rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold mb-4">Edit Appointment</h3>
+                        <label class="block mb-2">Email:</label>
+                        <input type="email" id="editEmail" value="${appointment.email}" class="w-full p-2 border border-gray-300 rounded-md mb-4" required />
+                        
+                        <label class="block mb-2">Doctor:</label>
+                        <input type="text" id="editDoctor" value="${appointment.doctor}" class="w-full p-2 border border-gray-300 rounded-md mb-4" required />
+                        
+                        <label class="block mb-2">Appointment Date:</label>
+                        <input type="datetime-local" id="editAppointmentDate" value="${new Date(appointment.appointmentDate).toISOString().slice(0, 16)}" class="w-full p-2 border border-gray-300 rounded-md mb-4" required />
+                        
+                        <button type="button" onclick="updateAppointment('${appointment._id}')" class="bg-blue-500 text-white px-4 py-2 rounded-md mr-2">Update Appointment</button>
+                        <button type="button" onclick="cancelEdit()" class="bg-gray-500 text-white px-4 py-2 rounded-md">Cancel</button>
+                    </div>
+                `;
 
+                const modal = document.createElement('div');
+                modal.classList.add('fixed', 'top-0', 'left-0', 'w-full', 'h-full', 'flex', 'items-center', 'justify-center', 'bg-gray-500', 'bg-opacity-50', 'z-50');
+                modal.innerHTML = formHtml;
+                document.body.appendChild(modal);
+
+            } catch (error) {
+                console.error("Error fetching appointment data:", error);
+                alert('Error fetching the appointment. Please try again.');
+            }
+        }
+
+        // Function to handle the update of the appointment
+        async function updateAppointment(id) {
             const updatedAppointment = {
-                email: document.getElementById('updateEmail').value,
-                doctor: document.getElementById('updateDoctor').value,
-                appointmentDate: document.getElementById('updateAppointmentDate').value
+                email: document.getElementById('editEmail').value,
+                doctor: document.getElementById('editDoctor').value,
+                appointmentDate: document.getElementById('editAppointmentDate').value
             };
 
             try {
                 await axios.put(`http://localhost:5000/api/appointments/${id}`, updatedAppointment);
                 fetchAppointments();  // Refresh the list after update
-                document.getElementById('modifyForm').classList.add('hidden');
                 alert('Appointment updated successfully');
+                document.querySelector('.fixed').remove(); // Remove modal after success
             } catch (error) {
                 console.error("Error updating appointment:", error);
                 alert('Error updating the appointment. Please try again.');
             }
-        };
-    } catch (error) {
-        console.error("Error fetching appointment data:", error);
-        alert('Error fetching the appointment. Please try again.');
-    }
-}
-        // Hide modify form on cancel
-        document.getElementById('cancelModifyBtn').onclick = () => {
-            document.getElementById('modifyForm').classList.add('hidden'); 
-        };
+        }
+
+        // Function to cancel the edit and close the modal
+        function cancelEdit() {
+            document.querySelector('.fixed').remove();
+        }
 
         // Initial fetch of appointments when page loads
         fetchAppointments();
