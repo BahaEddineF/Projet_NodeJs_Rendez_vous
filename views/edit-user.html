@@ -41,8 +41,7 @@
         document.getElementById('name').value = user.name;
         document.getElementById('email').value = user.email;
         document.getElementById('role').value = user.role;
-      })
-      .catch(err => console.error('Error fetching user:', err));
+      });
 
     // Handle form submission
     document.getElementById('edit-form').addEventListener('submit', (e) => {

@@ -41,6 +41,20 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Get user by ID (API)
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
+    res.json(user);
+  } catch (err) {
+    console.error('Error fetching user:', err);
+    res.status(500).send('Server Error');
+  }
+});
+
 // Add User
 app.post('/add-user', async (req, res) => {
   const { name, email, role } = req.body;
